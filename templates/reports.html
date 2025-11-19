@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Face Recognition Attendance System{% endblock %}
+{% block page_title %}Attendance Reports{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card report-card">
+            <div class="card-body text-center">
+                <i class="fas fa-file-pdf fa-3x text-danger mb-3"></i>
+                <h5>Daily Report</h5>
+                <p class="text-muted">Generate today's attendance report</p>
+                <button class="btn btn-danger" onclick="generateReport('daily')">
+                    <i class="fas fa-download"></i> Generate PDF
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card report-card">
+            <div class="card-body text-center">
+                <i class="fas fa-calendar-week fa-3x text-primary mb-3"></i>
+                <h5>Weekly Report</h5>
+                <p class="text-muted">Generate last 7 days report</p>
+                <button class="btn btn-primary" onclick="generateReport('weekly')">
+                    <i class="fas fa-download"></i> Generate PDF
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card report-card">
+            <div class="card-body text-center">
+                <i class="fas fa-calendar-alt fa-3x text-success mb-3"></i>
+                <h5>Monthly Report</h5>
+                <p class="text-muted">Generate monthly attendance report</p>
+                <button class="btn btn-success" onclick="generateReport('monthly')">
+                    <i class="fas fa-download"></i> Generate PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-calendar-plus"></i> Custom Date Range Report</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="customStartDate">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="customEndDate">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button class="btn btn-info" onclick="generateCustomReport()">
+                                <i class="fas fa-file-export"></i> Generate Custom Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-user-graduate"></i> Student-wise Report</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Select Student</label>
+                        <select class="form-select" id="studentSelect">
+                            <option value="">Loading students...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Date Range</label>
+                        <select class="form-select" id="studentReportRange">
+                            <option value="7">Last 7 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button class="btn btn-warning" onclick="generateStudentReport()">
+                                <i class="fas fa-user-check"></i> Generate Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-percentage"></i> Attendance Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="stat-row mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-calendar-day text-info"></i> Today's Attendance Rate</span>
+                        <strong class="text-info" id="todayRate">0%</strong>
+                    </div>
+                    <div class="progress mt-2" style="height: 20px;">
+                        <div class="progress-bar bg-info" role="progressbar" id="todayProgress" style="width: 0%">0%</div>
+                    </div>
+                </div>
+                <div class="stat-row mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-calendar-week text-primary"></i> Weekly Attendance Rate</span>
+                        <strong class="text-primary" id="weeklyRate">0%</strong>
+                    </div>
+                    <div class="progress mt-2" style="height: 20px;">
+                        <div class="progress-bar bg-primary" role="progressbar" id="weeklyProgress" style="width: 0%">0%</div>
+                    </div>
+                </div>
+                <div class="stat-row">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-calendar text-success"></i> Monthly Attendance Rate</span>
+                        <strong class="text-success" id="monthlyRate">0%</strong>
+                    </div>
+                    <div class="progress mt-2" style="height: 20px;">
+                        <div class="progress-bar bg-success" role="progressbar" id="monthlyProgress" style="width: 0%">0%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Low Attendance Alert</h5>
+            </div>
+            <div class="card-body" id="lowAttendanceList">
+                <p class="text-muted text-center">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load students for dropdown
+    function loadStudentsDropdown() {
+        fetch('/api/students')
+            .then(response => response.json())
+            .then(students => {
+                const select = document.getElementById('studentSelect');
+                
+                if (students.length === 0) {
+                    select.innerHTML = '<option value="">No students found</option>';
+                    return;
+                }
+
+                select.innerHTML = '<option value="">Select a student</option>' +
+                    students.map(student => 
+                        `<option value="${student.name}">${student.name} - ${student.branch}</option>`
+                    ).join('');
+            })
+            .catch(error => console.error('Error loading students:', error));
+    }
+
+    // Load attendance statistics
+    function loadStatistics() {
+        fetch('/api/dashboard-stats')
+            .then(response => response.json())
+            .then(data => {
+                const totalStudents = data.total_students || 1;
+                
+                // Today's rate
+                const todayRate = ((data.present_today / totalStudents) * 100).toFixed(1);
+                document.getElementById('todayRate').textContent = todayRate + '%';
+                document.getElementById('todayProgress').style.width = todayRate + '%';
+                document.getElementById('todayProgress').textContent = todayRate + '%';
+                
+                // Weekly rate (approximate)
+                const weeklyRate = Math.min(((data.avg_weekly_attendance / totalStudents) * 100), 100).toFixed(1);
+                document.getElementById('weeklyRate').textContent = weeklyRate + '%';
+                document.getElementById('weeklyProgress').style.width = weeklyRate + '%';
+                document.getElementById('weeklyProgress').textContent = weeklyRate + '%';
+                
+                // Monthly rate (approximate)
+                const monthlyRate = Math.min(((data.avg_weekly_attendance * 4 / totalStudents) * 100), 100).toFixed(1);
+                document.getElementById('monthlyRate').textContent = monthlyRate + '%';
+                document.getElementById('monthlyProgress').style.width = monthlyRate + '%';
+                document.getElementById('monthlyProgress').textContent = monthlyRate + '%';
+            });
+
+        // Load low attendance students
+        loadLowAttendanceStudents();
+    }
+
+    // Load students with low attendance
+    function loadLowAttendanceStudents() {
+        Promise.all([
+            fetch('/api/students').then(r => r.json()),
+            fetch('/api/attendance').then(r => r.json())
+        ])
+        .then(([students, attendance]) => {
+            const attendanceCounts = {};
+            
+            // Count attendance for each student
+            attendance.forEach(record => {
+                attendanceCounts[record.Name] = (attendanceCounts[record.Name] || 0) + 1;
+            });
+
+            // Find students with low attendance (< 75%)
+            const lowAttendanceStudents = students.filter(student => {
+                const count = attendanceCounts[student.name] || 0;
+                const rate = (count / 30) * 100; // Assuming 30 days
+                return rate < 75;
+            });
+
+            const listDiv = document.getElementById('lowAttendanceList');
+            
+            if (lowAttendanceStudents.length === 0) {
+                listDiv.innerHTML = '<p class="text-success text-center"><i class="fas fa-check-circle"></i> All students have good attendance!</p>';
+                return;
+            }
+
+            listDiv.innerHTML = lowAttendanceStudents.map(student => {
+                const count = attendanceCounts[student.name] || 0;
+                const rate = ((count / 30) * 100).toFixed(1);
+                
+                return `
+                    <div class="alert alert-warning d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>${student.name}</strong><br>
+                            <small>${student.branch} - Year ${student.year}</small>
+                        </div>
+                        <span class="badge bg-warning">${rate}%</span>
+                    </div>
+                `;
+            }).join('');
+        })
+        .catch(error => {
+            document.getElementById('lowAttendanceList').innerHTML = 
+                '<p class="text-danger text-center">Error loading data</p>';
+        });
+    }
+
+    // Generate report
+    function generateReport(type) {
+        alert(`Generating ${type} report... This feature will export the report as PDF.`);
+        // In production, you would make an API call to generate the PDF
+        // window.open(`/api/generate-report?type=${type}`, '_blank');
+    }
+
+    // Generate custom report
+    function generateCustomReport() {
+        const startDate = document.getElementById('customStartDate').value;
+        const endDate = document.getElementById('customEndDate').value;
+        
+        if (!startDate || !endDate) {
+            alert('Please select both start and end dates');
+            return;
+        }
+        
+        alert(`Generating custom report from ${startDate} to ${endDate}`);
+        // window.open(`/api/generate-report?type=custom&start=${startDate}&end=${endDate}`, '_blank');
+    }
+
+    // Generate student report
+    function generateStudentReport() {
+        const student = document.getElementById('studentSelect').value;
+        const range = document.getElementById('studentReportRange').value;
+        
+        if (!student) {
+            alert('Please select a student');
+            return;
+        }
+        
+        alert(`Generating report for ${student} (last ${range} days)`);
+        // window.open(`/api/generate-report?type=student&name=${student}&days=${range}`, '_blank');
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStudentsDropdown();
+        loadStatistics();
+        
+        // Set default custom dates
+        const today = new Date();
+        const lastMonth = new Date();
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        
+        document.getElementById('customEndDate').valueAsDate = today;
+        document.getElementById('customStartDate').valueAsDate = lastMonth;
+    });
+</script>
+
+<style>
+    .report-card {
+        transition: transform 0.2s;
+        border: 2px solid #e9ecef;
+    }
+
+    .report-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .stat-row {
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}

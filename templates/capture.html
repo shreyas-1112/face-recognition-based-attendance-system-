@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Capture Images - Face Recognition Attendance System{% endblock %}
+{% block page_title %}Capture Face Images{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-camera"></i> Capture Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form id="captureForm">
+                    <div class="mb-3">
+                        <label class="form-label">Select Student *</label>
+                        <select class="form-select" id="studentSelect" required>
+                            <option value="">Loading students...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Or Enter Name Manually</label>
+                        <input type="text" class="form-control" id="manualName" placeholder="Enter student name">
+                        <small class="text-muted">Use this if student is not in the database</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Images</label>
+                        <input type="number" class="form-control" id="imageCount" value="60" min="30" max="200">
+                        <small class="text-muted">Recommended: 60-100 images for better accuracy</small>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Instructions:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Make sure your face is well-lit</li>
+                            <li>Look directly at the camera</li>
+                            <li>Slowly move your head in different angles</li>
+                            <li>Keep your face in the green box</li>
+                            <li>Press 'q' to quit early</li>
+                        </ul>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-lg w-100" onclick="startCapture()">
+                        <i class="fas fa-play"></i> Start Capture
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Capture Instructions</h5>
+            </div>
+            <div class="card-body">
+                <h6><i class="fas fa-check-circle text-success"></i> Best Practices:</h6>
+                <ul>
+                    <li><strong>Lighting:</strong> Ensure good, even lighting on your face</li>
+                    <li><strong>Background:</strong> Use a plain, uncluttered background</li>
+                    <li><strong>Expression:</strong> Keep a neutral expression</li>
+                    <li><strong>Accessories:</strong> Capture with and without glasses if you wear them</li>
+                    <li><strong>Variety:</strong> Move your head slightly for different angles</li>
+                </ul>
+                
+                <h6 class="mt-4"><i class="fas fa-times-circle text-danger"></i> Things to Avoid:</h6>
+                <ul>
+                    <li>Strong backlighting or shadows</li>
+                    <li>Blurry or out-of-focus images</li>
+                    <li>Covering your face with hands or objects</li>
+                    <li>Extreme angles or tilted face</li>
+                    <li>Too much movement</li>
+                </ul>
+
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Note:</strong> After capturing images, make sure to click "Train Model" button in the sidebar to update the face recognition system.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-terminal"></i> Capture Console</h5>
+            </div>
+            <div class="card-body">
+                <div id="captureConsole" class="console-output">
+                    <p class="text-muted">Ready to capture images. Select a student and click "Start Capture".</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load students for dropdown
+    function loadStudentsDropdown() {
+        fetch('/api/students')
+            .then(response => response.json())
+            .then(students => {
+                const select = document.getElementById('studentSelect');
+                
+                if (students.length === 0) {
+                    select.innerHTML = '<option value="">No students found - Add students first</option>';
+                    return;
+                }
+
+                select.innerHTML = '<option value="">Select a student</option>' +
+                    students.map(student => 
+                        `<option value="${student.name}">${student.name} (${student.id}) - ${student.branch}</option>`
+                    ).join('');
+            })
+            .catch(error => {
+                console.error('Error loading students:', error);
+                document.getElementById('studentSelect').innerHTML = 
+                    '<option value="">Error loading students</option>';
+            });
+    }
+
+    // Start image capture
+    function startCapture() {
+        const studentName = document.getElementById('studentSelect').value || 
+                           document.getElementById('manualName').value;
+        const count = document.getElementById('imageCount').value;
+
+        if (!studentName) {
+            alert('Please select a student or enter a name manually');
+            return;
+        }
+
+        const consoleDiv = document.getElementById('captureConsole');
+        consoleDiv.innerHTML = `
+            <div class="alert alert-info">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                <strong>Initializing capture for ${studentName}...</strong>
+            </div>
+            <p class="mt-2">This will open a new window with your camera.</p>
+            <p>The capture process will run in the background using Python.</p>
+            <p><strong>Command:</strong> <code>python capture.py --name "${studentName}" --count ${count}</code></p>
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle"></i>
+                Please run the above command in your terminal/command prompt to start the capture process.
+                The web interface will be updated once the capture is complete.
+            </div>
+        `;
+
+        // Notify backend
+        fetch('/api/capture-start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: studentName, count: parseInt(count) })
+        })
+        .then(response => response.json())
+        .then(data => {
+            consoleDiv.innerHTML += `
+                <div class="alert alert-success mt-2">
+                    <i class="fas fa-check-circle"></i>
+                    ${data.message}
+                </div>
+                <p class="mt-3"><strong>Next Steps:</strong></p>
+                <ol>
+                    <li>Run the capture command in your terminal</li>
+                    <li>Follow the on-screen instructions</li>
+                    <li>Wait for all ${count} images to be captured</li>
+                    <li>Click "Train Model" in the sidebar to update recognition</li>
+                </ol>
+            `;
+        })
+        .catch(error => {
+            consoleDiv.innerHTML += `
+                <div class="alert alert-danger mt-2">
+                    <i class="fas fa-exclamation-circle"></i>
+                    Error: ${error}
+                </div>
+            `;
+        });
+    }
+
+    // Load students on page load
+    document.addEventListener('DOMContentLoaded', loadStudentsDropdown);
+</script>
+
+<style>
+    .console-output {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        min-height: 200px;
+        font-family: 'Courier New', monospace;
+    }
+
+    .console-output code {
+        background-color: #e9ecef;
+        padding: 2px 6px;
+        border-radius: 3px;
+        color: #d63384;
+    }
+</style>
+{% endblock %}

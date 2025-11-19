@@ -1,0 +1,32 @@
+{
+    "1KN23CD003": {
+        "name": "AISHWARYA P",
+        "email": "paishwarya0302@gmail.com",
+        "phone": "7411063392",
+        "branch": "Computer Science",
+        "year": "3",
+        "section": "D",
+        "enrollment_date": "2025-11-15",
+        "images_captured": 60
+    },
+    "1KN22CD001": {
+        "name": "ABHISHEK GOWDA",
+        "email": "abhigowda20201@gmail.com",
+        "phone": "8147013568",
+        "branch": "CSE-Data science",
+        "year": "4",
+        "section": "F",
+        "enrollment_date": "2025-11-17",
+        "images_captured": 60
+    },
+    "1KN22CD053": {
+        "name": "SHREYAS H M",
+        "email": "shreyasgowda916@gmail.com",
+        "phone": "09449487969",
+        "branch": "CSE-Data science",
+        "year": "4",
+        "section": "F",
+        "enrollment_date": "2025-11-18",
+        "images_captured": 60
+    }
+}

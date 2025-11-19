@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Live Recognition - Face Recognition Attendance System{% endblock %}
+{% block page_title %}Live Face Recognition{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-video"></i> Camera Feed</h5>
+                <div>
+                    <span class="badge bg-success" id="statusBadge">
+                        <i class="fas fa-circle"></i> Live
+                    </span>
+                </div>
+            </div>
+            <div class="card-body text-center bg-dark">
+                <img src="{{ url_for('video_feed') }}" id="videoFeed" class="img-fluid" style="max-width: 100%; height: auto;">
+                <div id="noFeed" style="display: none; padding: 100px 0; color: #fff;">
+                    <i class="fas fa-video-slash fa-3x mb-3"></i>
+                    <p>Camera feed not available</p>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        Face recognition is running. Detected faces will be marked with green boxes.
+                    </small>
+                    <button class="btn btn-sm btn-danger" onclick="stopRecognition()">
+                        <i class="fas fa-stop"></i> Stop
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Recognition Stats</h5>
+            </div>
+            <div class="card-body">
+                <div class="stat-item mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span><i class="fas fa-users text-primary"></i> Total Recognized Today</span>
+                        <strong id="totalRecognized">0</strong>
+                    </div>
+                </div>
+                <div class="stat-item mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span><i class="fas fa-user-check text-success"></i> Current Session</span>
+                        <strong id="sessionRecognized">0</strong>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="d-flex justify-content-between">
+                        <span><i class="fas fa-clock text-info"></i> Session Duration</span>
+                        <strong id="sessionDuration">00:00</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-history"></i> Recently Recognized</h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <div id="recognizedList">
+                    <p class="text-muted text-center">No faces recognized yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cog"></i> Recognition Settings</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Confidence Threshold</label>
+                            <input type="range" class="form-range" min="50" max="100" value="70" id="confidenceSlider">
+                            <small class="text-muted">Current: <span id="confidenceValue">70</span></small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Detection Scale</label>
+                            <select class="form-select" id="scaleSelect">
+                                <option value="1.1" selected>Normal (1.1)</option>
+                                <option value="1.2">Fast (1.2)</option>
+                                <option value="1.05">Accurate (1.05)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Auto-refresh</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                                <label class="form-check-label" for="autoRefresh">
+                                    Enable auto-refresh stats
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Tips:</strong> Lower confidence threshold will recognize more faces but may have more false positives. 
+                    Higher values are more strict but may miss some faces.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let sessionStart = new Date();
+    let recognizedSet = new Set();
+    let sessionRecognizedSet = new Set();
+
+    // Update confidence value display
+    document.getElementById('confidenceSlider').addEventListener('input', function() {
+        document.getElementById('confidenceValue').textContent = this.value;
+    });
+
+    // Check video feed
+    document.getElementById('videoFeed').addEventListener('error', function() {
+        document.getElementById('videoFeed').style.display = 'none';
+        document.getElementById('noFeed').style.display = 'block';
+        document.getElementById('statusBadge').innerHTML = '<i class="fas fa-circle"></i> Offline';
+        document.getElementById('statusBadge').classList.remove('bg-success');
+        document.getElementById('statusBadge').classList.add('bg-danger');
+    });
+
+    // Update session duration
+    function updateSessionDuration() {
+        const now = new Date();
+        const diff = Math.floor((now - sessionStart) / 1000);
+        const minutes = Math.floor(diff / 60);
+        const seconds = diff % 60;
+        document.getElementById('sessionDuration').textContent = 
+            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    // Load recent attendance and update stats
+    function updateRecognitionStats() {
+        fetch('/api/recent-attendance')
+            .then(response => response.json())
+            .then(data => {
+                // Today's unique recognized faces
+                const today = new Date().toISOString().split('T')[0];
+                const todayRecognized = data.filter(record => 
+                    record.Date.startsWith(today)
+                ).map(record => record.Name);
+                
+                recognizedSet = new Set(todayRecognized);
+                document.getElementById('totalRecognized').textContent = recognizedSet.size;
+                
+                // Update recognized list
+                const recognizedList = document.getElementById('recognizedList');
+                if (data.length > 0) {
+                    recognizedList.innerHTML = data.slice(0, 10).map(record => `
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                            <div>
+                                <i class="fas fa-user-circle text-primary"></i>
+                                <strong>${record.Name}</strong>
+                            </div>
+                            <small class="text-muted">${record.Time}</small>
+                        </div>
+                    `).join('');
+                } else {
+                    recognizedList.innerHTML = '<p class="text-muted text-center">No faces recognized yet</p>';
+                }
+            })
+            .catch(error => console.error('Error loading stats:', error));
+    }
+
+    // Stop recognition
+    function stopRecognition() {
+        if (confirm('Stop face recognition?')) {
+            window.location.href = '/';
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        updateRecognitionStats();
+        updateSessionDuration();
+        
+        // Update session duration every second
+        setInterval(updateSessionDuration, 1000);
+        
+        // Auto-refresh stats if enabled
+        setInterval(() => {
+            if (document.getElementById('autoRefresh').checked) {
+                updateRecognitionStats();
+            }
+        }, 5000);
+    });
+</script>
+
+<style>
+    .stat-item {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+
+    #recognizedList::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #recognizedList::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    #recognizedList::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    #recognizedList::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+</style>
+{% endblock %}

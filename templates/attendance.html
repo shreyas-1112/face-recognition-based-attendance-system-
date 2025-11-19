@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Records - Face Recognition Attendance System{% endblock %}
+{% block page_title %}Attendance Records{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-filter"></i> Filter Options</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="startDate">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="endDate">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Student Name</label>
+                        <input type="text" class="form-control" id="studentFilter" placeholder="Search by name">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" onclick="loadAttendance()">
+                                <i class="fas fa-search"></i> Apply Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="btn-group" role="group">
+            <button class="btn btn-success" onclick="exportAttendance()">
+                <i class="fas fa-file-excel"></i> Export CSV
+            </button>
+            <button class="btn btn-secondary" onclick="clearFilters()">
+                <i class="fas fa-eraser"></i> Clear Filters
+            </button>
+            <button class="btn btn-info" onclick="loadAttendance()">
+                <i class="fas fa-sync"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Attendance Records</h5>
+                <span class="badge bg-primary" id="recordCount">0 records</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="attendanceTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Student Name</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Day</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line"></i> Daily Attendance Trend</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="trendChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-user-clock"></i> Top Attendees</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="topAttendeesChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let trendChart, topAttendeesChart;
+    let allRecords = [];
+
+    // Set default dates (last 30 days)
+    function setDefaultDates() {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+        
+        document.getElementById('endDate').valueAsDate = endDate;
+        document.getElementById('startDate').valueAsDate = startDate;
+    }
+
+    // Load attendance records
+    function loadAttendance() {
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        const studentName = document.getElementById('studentFilter').value;
+
+        let url = '/api/attendance?';
+        if (startDate) url += `start_date=${startDate}&`;
+        if (endDate) url += `end_date=${endDate}&`;
+        if (studentName) url += `student_name=${studentName}&`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(records => {
+                allRecords = records;
+                displayRecords(records);
+                updateCharts(records);
+            })
+            .catch(error => {
+                console.error('Error loading attendance:', error);
+                document.getElementById('attendanceTableBody').innerHTML = 
+                    '<tr><td colspan="6" class="text-center text-danger">Error loading records</td></tr>';
+            });
+    }
+
+    // Display records in table
+    function displayRecords(records) {
+        const tbody = document.getElementById('attendanceTableBody');
+        document.getElementById('recordCount').textContent = `${records.length} records`;
+
+        if (records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No records found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = records.map((record, index) => {
+            const date = new Date(record.Date);
+            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+            
+            return `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>
+                        <i class="fas fa-user-circle text-primary"></i>
+                        <strong>${record.Name}</strong>
+                    </td>
+                    <td>${record.Date}</td>
+                    <td><span class="badge bg-info">${record.Time}</span></td>
+                    <td><span class="badge bg-success">Present</span></td>
+                    <td>${dayName}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Update charts
+    function updateCharts(records) {
+        if (records.length === 0) return;
+
+        // Daily trend
+        const dailyCounts = {};
+        records.forEach(record => {
+            const date = record.Date;
+            dailyCounts[date] = (dailyCounts[date] || 0) + 1;
+        });
+
+        const sortedDates = Object.keys(dailyCounts).sort();
+        const trendData = sortedDates.map(date => dailyCounts[date]);
+
+        updateTrendChart(sortedDates, trendData);
+
+        // Top attendees
+        const nameCounts = {};
+        records.forEach(record => {
+            nameCounts[record.Name] = (nameCounts[record.Name] || 0) + 1;
+        });
+
+        const sortedNames = Object.entries(nameCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+
+        updateTopAttendeesChart(
+            sortedNames.map(entry => entry[0]),
+            sortedNames.map(entry => entry[1])
+        );
+    }
+
+    // Update trend chart
+    function updateTrendChart(labels, data) {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        
+        if (trendChart) {
+            trendChart.destroy();
+        }
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Daily Attendance',
+                    data: data,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Update top attendees chart
+    function updateTopAttendeesChart(labels, data) {
+        const ctx = document.getElementById('topAttendeesChart').getContext('2d');
+        
+        if (topAttendeesChart) {
+            topAttendeesChart.destroy();
+        }
+
+        topAttendeesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Attendance Count',
+                    data: data,
+                    backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Export attendance
+    function exportAttendance() {
+        window.location.href = '/api/export-attendance';
+    }
+
+    // Clear filters
+    function clearFilters() {
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        document.getElementById('studentFilter').value = '';
+        setDefaultDates();
+        loadAttendance();
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        setDefaultDates();
+        loadAttendance();
+    });
+</script>
+{% endblock %}

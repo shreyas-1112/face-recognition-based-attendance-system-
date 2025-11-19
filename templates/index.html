@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Face Recognition Attendance System{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card stat-card-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-2">Total Students</h6>
+                        <h2 class="mb-0" id="totalStudents">0</h2>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card stat-card-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-2">Present Today</h6>
+                        <h2 class="mb-0" id="presentToday">0</h2>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card stat-card-danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-2">Absent Today</h6>
+                        <h2 class="mb-0" id="absentToday">0</h2>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card stat-card-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-2">Weekly Avg</h6>
+                        <h2 class="mb-0" id="weeklyAvg">0</h2>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Branch-wise Distribution</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="branchChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Attendance Percentage</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="attendanceChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Attendance -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-clock"></i> Recent Attendance</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentAttendanceTable">
+                            <tr>
+                                <td colspan="4" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let branchChart, attendanceChart;
+
+    // Load dashboard stats
+    function loadDashboardStats() {
+        fetch('/api/dashboard-stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalStudents').textContent = data.total_students;
+                document.getElementById('presentToday').textContent = data.present_today;
+                document.getElementById('absentToday').textContent = data.absent_today;
+                document.getElementById('weeklyAvg').textContent = data.avg_weekly_attendance;
+
+                // Update branch chart
+                updateBranchChart(data.branch_stats);
+                
+                // Update attendance chart
+                updateAttendanceChart(data);
+            })
+            .catch(error => console.error('Error loading stats:', error));
+    }
+
+    // Load recent attendance
+    function loadRecentAttendance() {
+        fetch('/api/recent-attendance')
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.getElementById('recentAttendanceTable');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center">No attendance records yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.slice(0, 10).map(record => `
+                    <tr>
+                        <td><i class="fas fa-user"></i> ${record.Name}</td>
+                        <td>${record.Date}</td>
+                        <td>${record.Time}</td>
+                        <td><span class="badge bg-success">Present</span></td>
+                    </tr>
+                `).join('');
+            })
+            .catch(error => console.error('Error loading attendance:', error));
+    }
+
+    // Update branch chart
+    function updateBranchChart(branchStats) {
+        const ctx = document.getElementById('branchChart').getContext('2d');
+        
+        if (branchChart) {
+            branchChart.destroy();
+        }
+
+        const labels = Object.keys(branchStats);
+        const data = Object.values(branchStats);
+        const colors = [
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 206, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(153, 102, 255, 0.8)',
+            'rgba(255, 159, 64, 0.8)'
+        ];
+
+        branchChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels.length > 0 ? labels : ['No Data'],
+                datasets: [{
+                    data: data.length > 0 ? data : [1],
+                    backgroundColor: colors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            }
+        });
+    }
+
+    // Update attendance chart
+    function updateAttendanceChart(stats) {
+        const ctx = document.getElementById('attendanceChart').getContext('2d');
+        
+        if (attendanceChart) {
+            attendanceChart.destroy();
+        }
+
+        const attendanceRate = stats.total_students > 0 
+            ? ((stats.present_today / stats.total_students) * 100).toFixed(1) 
+            : 0;
+        const absentRate = (100 - attendanceRate).toFixed(1);
+
+        attendanceChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Today\'s Attendance'],
+                datasets: [{
+                    label: 'Present %',
+                    data: [attendanceRate],
+                    backgroundColor: 'rgba(75, 192, 192, 0.8)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 2
+                }, {
+                    label: 'Absent %',
+                    data: [absentRate],
+                    backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDashboardStats();
+        loadRecentAttendance();
+        
+        // Refresh every 30 seconds
+        setInterval(() => {
+            loadDashboardStats();
+            loadRecentAttendance();
+        }, 30000);
+    });
+</script>
+{% endblock %}
